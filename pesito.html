@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cuánto sale en pesos</title>
+<meta name="description" content="Calculá cuántos pesos argentinos te cobran por una compra en dólares en Steam, PlayStation, Epic Games, Roblox y más.">
+<style>
+:root {
+  --bg: #111418;
+  --fg: #f2f4f6;
+  --muted: #8b949e;
+  --line: #262c33;
+  --accent: #7cc4f5;
+  --on: #0b1620;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --fg: #14181c;
+    --muted: #66707a;
+    --line: #e3e7eb;
+    --accent: #1f7fc4;
+    --on: #ffffff;
+    color-scheme: light;
+  }
+}
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  overflow: hidden;
+}
+main {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+input {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+}
+.rate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.rate label { flex: 1; }
+.rate input {
+  width: 90px;
+  text-align: right;
+  color: var(--fg);
+  font-size: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0;
+}
+.rate button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--fg);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.status { font-size: 12px; color: var(--muted); margin-top: -8px; min-height: 15px; }
+.amount {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 2px solid var(--line);
+  padding: 4px 0;
+}
+.amount:focus-within { border-color: var(--accent); }
+.amount span { font-size: 22px; color: var(--muted); }
+.amount input { flex: 1; width: 100%; font-size: 44px; font-weight: 700; }
+.chips { display: flex; gap: 8px; }
+.chips button {
+  flex: 1;
+  background: none;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 6px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on); font-weight: 600; }
+.list { font-size: 12.5px; color: var(--muted); line-height: 1.4; margin-top: -6px; height: 4.2em; overflow: hidden; }
+.total small { font-size: 14px; color: var(--muted); }
+.total strong {
+  display: block;
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 52px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.row span:first-child { color: var(--muted); }
+.row.off { visibility: hidden; }
+.iibb input {
+  width: 34px;
+  text-align: right;
+  color: var(--fg);
+  border-bottom: 1px dashed var(--muted);
+  font-size: 15px;
+}
+.note { font-size: 12px; color: var(--muted); line-height: 1.4; }
+@media (max-height: 660px) {
+  .note { display: none; }
+  main { gap: 10px; }
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="rate">
+    <label for="rate">Dólar oficial (venta)</label>
+    <input id="rate" type="text" inputmode="decimal" autocomplete="off" placeholder="…">
+    <button id="refresh" type="button" aria-label="Actualizar cotización">↻</button>
+  </div>
+  <div id="status" class="status" aria-live="polite"></div>
+
+  <div class="amount">
+    <span>US$</span>
+    <input id="usd" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="Precio en dólares">
+  </div>
+
+  <div class="chips" role="group" aria-label="Tipo de compra">
+    <button type="button" data-mode="games" aria-pressed="true">Steam, PlayStation, Epic</button>
+    <button type="button" data-mode="other" aria-pressed="false">Roblox, Netflix, Spotify</button>
+  </div>
+  <div id="list" class="list"></div>
+
+  <div class="total">
+    <small>Vas a pagar</small>
+    <strong id="total">$ 0</strong>
+  </div>
+
+  <div>
+    <div class="row"><span>Precio en pesos</span><span id="base">$ 0</span></div>
+    <div class="row"><span>IVA 21%</span><span id="iva">$ 0</span></div>
+    <div class="row">
+      <span class="iibb">Ingresos Brutos <input id="iibb" type="text" inputmode="decimal" value="2" aria-label="Porcentaje de Ingresos Brutos">%</span>
+      <span id="iibbAmt">$ 0</span>
+    </div>
+    <div class="row off" id="percRow"><span>Percepción Ganancias 30%</span><span id="perc">$ 0</span></div>
+  </div>
+
+  <p class="note">Estimación. Tu banco puede cobrar sellos o redondear distinto. Ingresos Brutos cambia según la provincia.</p>
+</main>
+
+<script>
+const IVA = 0.21;
+const PERCEPCION = 0.30;
+const REFRESH_MS = 60000;
+const MAX_FONT = 52;
+const GROUPS = {
+  games: {
+    perception: false,
+    names: "Steam, PlayStation, Xbox, Epic, Nintendo, Battle.net, EA, Riot, Rockstar y otras de juegos. Sin percepción."
+  },
+  other: {
+    perception: true,
+    names: "Roblox, Netflix, Spotify, YouTube, Disney+, Prime Video, Apple, Google Play, ChatGPT, Discord y otros servicios. Con percepción."
+  }
+};
+const SOURCES = [
+  { url: "https://dolarapi.com/v1/dolares/oficial", read: d => d.venta },
+  { url: "https://api.bluelytics.com.ar/v2/latest", read: d => d.oficial.value_sell }
+];
+
+const $ = id => document.getElementById(id);
+const els = {
+  rate: $("rate"), refresh: $("refresh"), status: $("status"), usd: $("usd"),
+  list: $("list"), total: $("total"), base: $("base"), iva: $("iva"),
+  iibb: $("iibb"), iibbAmt: $("iibbAmt"), perc: $("perc"), percRow: $("percRow")
+};
+
+let mode = "games";
+let manualRate = false;
+let fetchedAt = null;
+let failed = false;
+
+const parseRate = v => {
+  const n = parseFloat(String(v).replace(/\./g, "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+const parseLoose = v => {
+  const n = parseFloat(String(v).replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+const ars = n => "$ " + Math.round(n).toLocaleString("es-AR");
+const rateText = n => n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function fitTotal() {
+  const width = els.total.parentElement.clientWidth;
+  const chars = els.total.textContent.length;
+  const size = Math.floor(width / (chars * 0.62));
+  els.total.style.fontSize = Math.max(18, Math.min(MAX_FONT, size)) + "px";
+}
+
+function calculate() {
+  const group = GROUPS[mode];
+  const base = parseLoose(els.usd.value) * parseRate(els.rate.value);
+  const iva = base * IVA;
+  const iibb = base * (parseLoose(els.iibb.value) / 100);
+  const perc = group.perception ? (base + iva + iibb) * PERCEPCION : 0;
+
+  els.base.textContent = ars(base);
+  els.iva.textContent = ars(iva);
+  els.iibbAmt.textContent = ars(iibb);
+  els.perc.textContent = ars(perc);
+  els.percRow.classList.toggle("off", !group.perception);
+  els.list.textContent = group.names;
+  els.total.textContent = ars(base + iva + iibb + perc);
+  fitTotal();
+}
+
+function renderStatus() {
+  els.status.style.color = failed ? "#d9902b" : "";
+  if (failed) {
+    els.status.textContent = "No se pudo traer la cotización. Escribila a mano o tocá ↻.";
+  } else if (manualRate) {
+    els.status.textContent = "Cotización manual. Tocá ↻ para volver a la automática.";
+  } else if (!fetchedAt) {
+    els.status.textContent = "Buscando cotización…";
+  } else {
+    const mins = Math.floor((Date.now() - fetchedAt) / 60000);
+    els.status.textContent = mins < 1 ? "Actualizado recién" : "Actualizado hace " + mins + " min";
+  }
+}
+
+async function loadRate() {
+  let value = 0;
+  for (const src of SOURCES) {
+    try {
+      const res = await fetch(src.url, { cache: "no-store" });
+      if (!res.ok) continue;
+      const v = Number(src.read(await res.json()));
+      if (v > 0) {
+        value = v;
+        break;
+      }
+    } catch (e) {}
+  }
+  if (value) {
+    failed = false;
+    fetchedAt = Date.now();
+    if (!manualRate) els.rate.value = rateText(value);
+  } else {
+    failed = !els.rate.value;
+  }
+  renderStatus();
+  calculate();
+}
+
+els.usd.addEventListener("input", calculate);
+els.iibb.addEventListener("input", calculate);
+els.rate.addEventListener("input", () => {
+  manualRate = true;
+  failed = false;
+  renderStatus();
+  calculate();
+});
+els.refresh.addEventListener("click", () => {
+  manualRate = false;
+  loadRate();
+});
+document.querySelectorAll(".chips button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    mode = btn.dataset.mode;
+    document.querySelectorAll(".chips button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+    calculate();
+  });
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) loadRate();
+});
+window.addEventListener("resize", fitTotal);
+
+setInterval(() => {
+  if (document.hidden) return;
+  if (Date.now() - fetchedAt >= REFRESH_MS) loadRate();
+  else renderStatus();
+}, 30000);
+
+renderStatus();
+calculate();
+loadRate();
+</script>
+</body>
+</html>
